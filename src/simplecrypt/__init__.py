@@ -14,6 +14,7 @@ HASH = SHA256
 PREFIX = b'sc'
 HEADER = (PREFIX + b'\x00\x00', PREFIX + b'\x00\x01', PREFIX + b'\x00\x02')
 LATEST = 2   # index into SALT_LEN, EXPANSION_COUNT, HEADER
+FILE_CHUNK_SIZE = 4000000  # 1mb
 
 # lengths here are in bits, but pcrypto uses block size in bytes
 HALF_BLOCK = AES.block_size*8//2
@@ -23,6 +24,32 @@ for salt_len in SALT_LEN:
 HEADER_LEN = 4
 for header in HEADER:
     assert len(header) == HEADER_LEN
+
+
+def encrypt_file(password, src, dest):
+   _crypt_file(password, src, dest, encrypt)
+
+
+def decrypt_file(password, src, dest):
+    _crypt_file(password, src, dest, decrypt)
+
+
+def _crypt_file(password, src, dest, method):
+    '''
+    Encrypt or Decrypt a source file and write to a destination file in chunks.
+
+    @param password: The secret value used as a basis for a key.
+    @param src: The source file path.
+    @param dest: The destination file path.
+    @param method: `encrypt` or `decrypt` (callable)
+    '''
+    assert method in (encrypt, decrypt), "`method` must be one of: `encrypt`, `decrypt`"
+    assert src != dest, "The source path must not be identical to the destination path."
+
+    chunksize = FILE_CHUNK_SIZE if method is encrypt else FILE_CHUNK_SIZE + HEADER_LEN + HALF_BLOCK
+    with open(src, 'rb') as src_, open(dest, 'wb') as dest_:
+        for chunk in iter(lambda: src_.read(chunksize), b''):
+            dest_.write(method(password, chunk))
 
 
 def encrypt(password, data):
